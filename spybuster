@@ -1,0 +1,67 @@
+#!/bin/bash
+
+#####################
+# I'm still working #
+# on it !           #
+#####################
+#         by 0x24e  #
+
+while getopts "u:w:" option; do
+    case "${option}" in
+        u) url=${OPTARG};;
+        w) wordlist=${OPTARG};;
+        ?) echo -e "Invalid option: Use -u <url> or -w [<wordlist>] -o [<location>]"; exit 1;;
+    esac
+done
+
+
+# Error Handler
+[[ -z "$url" ]] && { echo -e "Error: \e[31m-u \e[33m<url>\e[0m is required" >&2; exit 1; }
+[[ -z "$wordlist" ]] && { echo -e "Error: \e[31m-w \e[33m<wordlist>\e[0m is required" >&2; exit 1; }
+
+#Wordlist Handler.
+if [[ -n "$wordlist" ]]; then
+    if [[ ! -f "$wordlist" ]]; then
+        echo "Error: Wordlist file '$wordlist' not found!" >&2
+        exit 1
+    fi
+    WORDLIST="$wordlist"
+else
+    WORDLIST=""
+fi
+
+# Shows the name of the wordlist
+# and the total words.
+if [[ -n "$WORDLIST" ]]; then
+    echo "==========================================="
+    echo " Reading wordlist: $WORDLIST "
+    echo " Total words: $(wc -l < "$WORDLIST") "
+    echo "==========================================="
+    echo "[*] research begins ... "
+
+    counter=1
+    
+    # Brute-Force lines.
+    # Try every words in the wordlist.
+    while IFS= read -r word; do
+        
+        # Curl line.
+        if [ -n "$word" ]; then        
+            status_code=$(curl -sI "$url$word" | awk '/HTTP/ {print $2}' | tail -1)                       
+        fi
+        
+        # Shows the result: Status code + the url.
+        if [ "$status_code" = "200" ]; then
+            echo -e "STATUS CODE: \e[1;32m$status_code\e[0m | $url\e[1;34m$word\e[0m"           
+        elif [ -z "$status_code" ]; then            
+            echo -e "ERROR: \e[1;33mNothing found ...\e[0m | $url\e[1;34m$word\e[0m"           
+        elif [ "$status_code" = "404" ]; then           
+            echo -e "STATUS CODE: \e[1;31m$status_code\e[0m | $url\e[1;34m$word\e[0m"          
+        else            
+            echo -e "STATUS CODE: \e[1;34m$status_code\e[0m | $url\e[1;34m$word\e[0m"           
+        fi
+        
+    done < "$WORDLIST"
+    echo "[*] Research Done !"
+fi
+
