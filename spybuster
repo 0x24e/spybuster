@@ -1,11 +1,5 @@
 #!/bin/bash
 
-#####################
-# I'm still working #
-# on it !           #
-#####################
-#         by 0x24e  #
-
 while getopts "u:w:" option; do
     case "${option}" in
         u) url=${OPTARG};;
