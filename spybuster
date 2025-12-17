@@ -1,9 +1,11 @@
 #!/bin/bash
 
-while getopts "u:w:" option; do
+
+while getopts "u:w:f:" option; do
     case "${option}" in
         u) url=${OPTARG};;
         w) wordlist=${OPTARG};;
+        f) filter=${OPTARG};;
         ?) echo -e "Invalid option: Use -u <url> or -w [<wordlist>]"; exit 1;;
     esac
 done
@@ -24,38 +26,38 @@ else
     WORDLIST=""
 fi
 
-# Shows the name of the wordlist
-# and the total words.
+
 if [[ -n "$WORDLIST" ]]; then
     echo "==========================================="
     echo " Reading wordlist: $WORDLIST "
     echo " Total words: $(wc -l < "$WORDLIST") "
     echo "==========================================="
     echo "[*] research begins ... "
-
-    counter=1
     
-    # Brute-Force lines.
-    # Try every words in the wordlist.
+    FILTER="$filter"
+    counter=1
     while IFS= read -r word; do
-        
-        # Curl line.
+                          
         if [ -n "$word" ]; then        
-            status_code=$(curl -sI "$url$word" | awk '/HTTP/ {print $2}' | tail -1)                       
+                status_code=$(curl -sI "$url$word" | awk '/HTTP/ {print $2}' | tail -l)                       
         fi
         
-        # Shows the result: Status code + the url.
+        [[ -z "$status_code" ]] && status_code="" 
+                                  
         if [ "$status_code" = "200" ]; then
-            echo -e "STATUS CODE: \e[1;32m$status_code\e[0m | $url\e[1;34m$word\e[0m"           
+            line="STATUS CODE: \e[1;32m$status_code\e[0m | $url\e[1;34m$word\e[0m"
         elif [ -z "$status_code" ]; then            
-            echo -e "ERROR: \e[1;33mNothing found ...\e[0m | $url\e[1;34m$word\e[0m"           
+            line="ERROR: \e[1;33mNothing found ...\e[0m | $url\e[1;34m$word\e[0m"
         elif [ "$status_code" = "404" ]; then           
-            echo -e "STATUS CODE: \e[1;31m$status_code\e[0m | $url\e[1;34m$word\e[0m"          
+            line="STATUS CODE: \e[1;31m$status_code\e[0m | $url\e[1;34m$word\e[0m"
         else            
-            echo -e "STATUS CODE: \e[1;34m$status_code\e[0m | $url\e[1;34m$word\e[0m"           
+            line="STATUS CODE: \e[1;34m$status_code\e[0m | $url\e[1;34m$word\e[0m"
+        fi
+        
+        if [[ -z "$FILTER" || "$status_code" =~ ^($FILTER)$ ]]; then
+            echo -e "$line"
         fi
         
     done < "$WORDLIST"
     echo "[*] Research Done !"
 fi
-
