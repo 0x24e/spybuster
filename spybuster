@@ -1,63 +1,54 @@
 #!/bin/bash
 
+# Default settings = 20
+threads=20
 
-while getopts "u:w:f:" option; do
-    case "${option}" in
-        u) url=${OPTARG};;
-        w) wordlist=${OPTARG};;
-        f) filter=${OPTARG};;
-        ?) echo -e "Invalid option: Use -u <url> or -w [<wordlist>]"; exit 1;;
+
+while getopts "u:w:f:c:" opt; do
+    case $opt in
+        u) URL="$OPTARG" ;;
+        w) WORDLIST="$OPTARG" ;;
+        f) FILTER="$OPTARG" ;;
+        c) CONCURRENCY="$OPTARG" ;;
+        *) echo "Usage: $0 -u <url> -w <wordlist> [-f <status>] [-c <threads>]" >&2; exit 1 ;;
     esac
 done
 
 
-# Error Handler
-[[ -z "$url" ]] && { echo -e "Error: \e[31m-u \e[33m<url>\e[0m is required" >&2; exit 1; }
-[[ -z "$wordlist" ]] && { echo -e "Error: \e[31m-w \e[33m<wordlist>\e[0m is required" >&2; exit 1; }
+[[ -z "$URL" || -z "$WORDLIST" ]] && { echo "Error: -u and -w are required" >&2; exit 1; }
+[[ ! -f "$WORDLIST" ]] && { echo "Error: Wordlist '$WORDLIST' not found" >&2; exit 1; }
 
-#Wordlist Handler.
-if [[ -n "$wordlist" ]]; then
-    if [[ ! -f "$wordlist" ]]; then
-        echo "Error: Wordlist file '$wordlist' not found!" >&2
-        exit 1
+
+[[ "${URL: -1}" != "/" ]] && URL="${URL}/"
+
+
+echo "==========================================="
+echo " Target     : $URL"
+echo " Wordlist   : $(wc -l < "$WORDLIST") words"
+echo " Threads    : $CONCURRENCY"
+[[ -n "$FILTER" ]] && echo " Filter     : status code $FILTER"
+echo "==========================================="
+echo "[*] Starting directory brute-force..."
+
+
+export URL FILTER
+cat "$WORDLIST" | xargs -P "$threads" -I{} bash -c '
+    path="{}"
+    full_url="${URL}${path}"
+    status=$(curl --connect-timeout 10 -o /dev/null -s -w "%{http_code}" "$full_url" 2>/dev/null || echo "000")
+
+    case "$status" in
+        200) color="\e[1;32m" ;;
+        301|302|307|308) color="\e[1;35m" ;;
+        403) color="\e[1;33m" ;;
+        404) color="\e[1;31m" ;;   
+        000) color="\e[1;33m"; status="NO RESPONSE" ;;
+        *)   color="\e[1;34m" ;;
+    esac
+
+    if [[ -z "$FILTER" || "$status" == "$FILTER" || ("$status" == "NO RESPONSE" && "$FILTER" == "000") ]]; then
+        echo -e "[${color}$status\e[0m] $full_url"
     fi
-    WORDLIST="$wordlist"
-else
-    WORDLIST=""
-fi
+'
 
-
-if [[ -n "$WORDLIST" ]]; then
-    echo "==========================================="
-    echo " Reading wordlist: $WORDLIST "
-    echo " Total words: $(wc -l < "$WORDLIST") "
-    echo "==========================================="
-    echo "[*] research begins ... "
-    
-    FILTER="$filter"
-    counter=1
-    while IFS= read -r word; do
-                          
-        if [ -n "$word" ]; then        
-                status_code=$(curl -sI "$url$word" | awk '/HTTP/ {print $2}' | tail -l)                       
-        fi
-        
-        [[ -z "$status_code" ]] && status_code="" 
-                                  
-        if [ "$status_code" = "200" ]; then
-            line="STATUS CODE: \e[1;32m$status_code\e[0m | $url\e[1;34m$word\e[0m"
-        elif [ -z "$status_code" ]; then            
-            line="ERROR: \e[1;33mNothing found ...\e[0m | $url\e[1;34m$word\e[0m"
-        elif [ "$status_code" = "404" ]; then           
-            line="STATUS CODE: \e[1;31m$status_code\e[0m | $url\e[1;34m$word\e[0m"
-        else            
-            line="STATUS CODE: \e[1;34m$status_code\e[0m | $url\e[1;34m$word\e[0m"
-        fi
-        
-        if [[ -z "$FILTER" || "$status_code" =~ ^($FILTER)$ ]]; then
-            echo -e "$line"
-        fi
-        
-    done < "$WORDLIST"
-    echo "[*] Research Done !"
-fi
+echo "[*] Done !"
