@@ -4,7 +4,7 @@ while getopts "u:w:" option; do
     case "${option}" in
         u) url=${OPTARG};;
         w) wordlist=${OPTARG};;
-        ?) echo -e "Invalid option: Use -u <url> or -w [<wordlist>] -o [<location>]"; exit 1;;
+        ?) echo -e "Invalid option: Use -u <url> or -w [<wordlist>]"; exit 1;;
     esac
 done
 
